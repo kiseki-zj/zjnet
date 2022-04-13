@@ -8,16 +8,13 @@ class MutexLock {
     MutexLock()
     : holder_(0) {
         pthread_mutex_init(&mutex_, NULL);
-    }
-    
+    }   
     void lock() {
-
+        pthread_mutex_lock(&mutex_);
     }
-
     void unlock() {
-
+        pthread_mutex_unlock(&mutex_);
     }
-
 
  private:
     pthread_mutex_t mutex_;

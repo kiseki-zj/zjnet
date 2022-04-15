@@ -7,6 +7,7 @@
 #include "noncopyable.h"
 #include <memory>
 #include <vector>
+#include <string>
 class AsyncLogging : noncopyable {
  public:
     AsyncLogging(const std::string& basename,
@@ -39,6 +40,8 @@ class AsyncLogging : noncopyable {
     BufferPtr currentBuffer_, nextBuffer_;
     BufferVec buffers_;
     MutexLock mutex_;
+    Condition cond_;
+    std::string basename_;
 
 };
 

@@ -1,5 +1,7 @@
 #include "AsyncLogging.h"
+#include "LogFile.h"
 #include <unistd.h>
+
 AsyncLogging::AsyncLogging(const std::string& basename,
                            off_t rollsize,
                            int flushInterval)
@@ -9,7 +11,9 @@ AsyncLogging::AsyncLogging(const std::string& basename,
     currentBuffer_(new Buffer),
     nextBuffer_(new Buffer),
     mutex_(),
-    buffers_() {
+    buffers_(), 
+    cond_(mutex_),
+    basename_(basename) {
     currentBuffer_->bzero();
     nextBuffer_->bzero();
     buffers_.reserve(16);
@@ -27,12 +31,13 @@ void AsyncLogging::append(const char* logline, int len) {
             currentBuffer_.reset(new Buffer);
         }
         currentBuffer_->append(logline, len);
-        //cond_.notify();
+        cond_.notify();
     }
 
-}
+} 
 
 void AsyncLogging::threadFunc() {
+    LogFile output(basename_);
     BufferVec buffersToWrite;
     BufferPtr newBuffer1(new Buffer);
     BufferPtr newBuffer2(new Buffer);
@@ -40,9 +45,11 @@ void AsyncLogging::threadFunc() {
     newBuffer2->bzero();
     buffersToWrite.reserve(16);
     while (running_) {
-        sleep(2);
         {
             MutexLockGuard lock(mutex_);
+            if (buffers_.empty()) {
+                cond_.waitforseconds(flushInterval_);
+            }   
             buffers_.push_back(std::move(currentBuffer_));
             if (!buffers_.empty()) {
                 buffersToWrite.swap(buffers_);
@@ -55,12 +62,16 @@ void AsyncLogging::threadFunc() {
     
         //output
         int len = 0;
+        // for (const auto& buffer : buffersToWrite) {
+        //     fprintf(stderr, "%s", buffer->data());
+        //     fprintf(stderr, "%d\n", buffer->len());
+        //     len += buffer->len();
+        // }
+        // fprintf(stderr, "Output len = %d", len);
         for (const auto& buffer : buffersToWrite) {
-            fprintf(stderr, "%s", buffer->data());
-            fprintf(stderr, "%d\n", buffer->len());
-            len += buffer->len();
+            output.append(buffer->data(), buffer->len());
         }
-        fprintf(stderr, "Output len = %d", len);
+        output.flush();
         //reset newbuffer
         if (!newBuffer1) {
             newBuffer1 = std::move(buffersToWrite.back());

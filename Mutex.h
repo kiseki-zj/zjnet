@@ -2,27 +2,29 @@
 #define _MUTEX_H_
 
 #include <pthread.h>
+#include "noncopyable.h"
 
-class MutexLock {
+class MutexLock : noncopyable {
  public:
     MutexLock()
     : holder_(0) {
-        pthread_mutex_init(&mutex_, NULL);
+        pthread_mutex_init(&pmutex_, NULL);
     }   
     void lock() {
-        pthread_mutex_lock(&mutex_);
+        pthread_mutex_lock(&pmutex_);
     }
     void unlock() {
-        pthread_mutex_unlock(&mutex_);
+        pthread_mutex_unlock(&pmutex_);
     }
 
  private:
-    pthread_mutex_t mutex_;
+    friend class Condition;
+    pthread_mutex_t pmutex_;
     pid_t holder_;
 
 };
 
-class MutexLockGuard {
+class MutexLockGuard : noncopyable {
  public:
     explicit MutexLockGuard(MutexLock& mutex)
     : mutex_(mutex) {
@@ -34,6 +36,28 @@ class MutexLockGuard {
 
  private:
     MutexLock& mutex_;
+};
+
+class Condition : noncopyable {
+ public:
+    explicit Condition(MutexLock& mutex) 
+    : mutex_(mutex) {
+        pthread_cond_init(&pcond_, NULL);
+    }
+    ~Condition() {
+        pthread_cond_destroy(&pcond_);
+    }
+    void wait() {
+        pthread_cond_wait(&pcond_, &mutex_.pmutex_);
+    }
+    void notify() {
+        pthread_cond_signal(&pcond_);
+    }
+    void waitforseconds(double seconds);
+
+ private:
+    MutexLock& mutex_;
+    pthread_cond_t pcond_;
 };
 
 #endif

@@ -1,0 +1,9 @@
+TODO
+1.asynclog文件操作
+2.log流式实现
+我的实现：
+LOG << "abc";
+LOG宏会创建一个Logging类，Logging类会格式化时间，行数等信息，并重载<<；
+分号结束后Logging类析构，析构之前就把所有字符串append到asynclog里，asynclog保证了pthread_once
+muduo的实现多了一个logstream类，log会先输入到stream类里的一个buffer，最后logging析构时再把buffer append到asynclog
+我认为这样多了一次内存拷贝
